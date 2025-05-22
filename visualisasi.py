@@ -2,9 +2,17 @@ import streamlit as st
 import requests
 from datetime import datetime
 from pymongo import MongoClient
+import os
+from pymongo import MongoClient
+from dotenv import load_dotenv
 
 # Koneksi MongoDB (ubah sesuai konfigurasi kamu)
-client = MongoClient("mongodb://localhost:27017/")
+
+load_dotenv()  # load .env file
+
+mongo_uri = os.getenv("MONGODB_URI")
+
+client = MongoClient(mongo_uri)
 db = client["fitness_db"]
 collection = db["exercises"]
 
