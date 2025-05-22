@@ -13,7 +13,7 @@ load_dotenv()  # load .env file
 mongo_uri = os.getenv("MONGODB_URI")
 
 client = MongoClient(mongo_uri)
-db = client["fitness_db"]
+db = client["capstone"]
 collection = db["exercises"]
 
 # Fungsi sinkronisasi data dari API WGER
