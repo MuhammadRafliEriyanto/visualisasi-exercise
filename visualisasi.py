@@ -1,35 +1,16 @@
-from flask import Flask
-from flask_apscheduler import APScheduler
+import streamlit as st
 import requests
-from pymongo import MongoClient, errors
-from datetime import datetime, timedelta
+from datetime import datetime
+from pymongo import MongoClient
 
-app = Flask(__name__)
+# Koneksi MongoDB (ubah sesuai konfigurasi kamu)
+client = MongoClient("mongodb://localhost:27017/")
+db = client["fitness_db"]
+collection = db["exercises"]
 
-class Config:
-    SCHEDULER_API_ENABLED = True
-
-app.config.from_object(Config())
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
-
+# Fungsi sinkronisasi data dari API WGER
 def sync_exercise_data():
     try:
-        print("\n🔄 Mulai sinkronisasi data latihan...")
-        print(f"⏰ Waktu: {datetime.now()}")
-
-        # 🔧 Ubah koneksi database
-        client = MongoClient("mongodb://localhost:27017/")
-        db = client['capstone']  # Ganti dengan nama database baru
-        collection = db['visualisasi2']  # Nama collection tanpa spasi
-
-        # Buat index unik berdasarkan 'id'
-        try:
-            collection.create_index('id', unique=True)
-        except errors.OperationFailure as e:
-            print(f"⚠ Gagal membuat index (mungkin sudah ada): {e}")
-
         # Ambil kategori
         categories = requests.get('https://wger.de/api/v2/exercisecategory/').json()['results']
         category_dict = {cat['id']: cat['name'] for cat in categories}
@@ -44,7 +25,7 @@ def sync_exercise_data():
 
         # Ambil semua latihan
         all_exercises = []
-        next_url = 'https://wger.de/api/v2/exercise/?limit=100'
+        next_url = 'https://wger.de/api/v2/exerciseinfo/?limit=100&language=2'
 
         while next_url:
             response = requests.get(next_url)
@@ -52,40 +33,47 @@ def sync_exercise_data():
             all_exercises.extend(data['results'])
             next_url = data['next']
 
-        # Tambahkan info dan simpan
         total_saved = 0
         now = datetime.utcnow()
+
         for exercise in all_exercises:
-            exercise['category_name'] = category_dict.get(exercise.get('category'), 'Unknown')
-            exercise['equipment_names'] = [equipment_dict.get(eq_id, 'Unknown') for eq_id in exercise.get('equipment', [])]
-            exercise['muscle_names'] = [muscle_dict.get(mid, 'Unknown') for mid in exercise.get('muscles', [])]
-            exercise['muscle_secondary_names'] = [muscle_dict.get(mid, 'Unknown') for mid in exercise.get('muscles_secondary', [])]
+            exercise['category_name'] = category_dict.get(exercise.get('category', {}).get('id'), 'Unknown')
+            exercise['equipment_names'] = [equipment_dict.get(eq.get('id'), 'Unknown') for eq in exercise.get('equipment', [])]
+            exercise['muscle_names'] = [muscle_dict.get(m.get('id'), 'Unknown') for m in exercise.get('muscles', [])]
+            exercise['muscle_secondary_names'] = [muscle_dict.get(m.get('id'), 'Unknown') for m in exercise.get('muscles_secondary', [])]
             exercise['last_synced'] = now
+
+            if not exercise.get('name'):
+                exercise['name'] = 'No Name'
 
             collection.replace_one({'id': exercise['id']}, exercise, upsert=True)
             total_saved += 1
 
-        print(f"✅ Sinkronisasi selesai. Total data diproses: {total_saved} latihan.")
+        return total_saved
 
     except Exception as e:
-        print(f"❌ Terjadi kesalahan saat sinkronisasi: {e}")
+        return f"❌ Error: {e}"
 
-# Jadwalkan setiap 30 detik
-scheduler.add_job(id='SyncDataJob', func=sync_exercise_data, trigger='interval', seconds=30)
+# Streamlit UI
+st.title("💪 WGER Exercise Sync App")
 
-@app.route('/')
-def home():
-    return 'Scheduler aktif. Sinkronisasi akan tampil di terminal.'
+if st.button("🔄 Sinkronisasi Data Latihan"):
+    result = sync_exercise_data()
+    if isinstance(result, int):
+        st.success(f"✅ Sinkronisasi berhasil. Total data disimpan: {result}")
+    else:
+        st.error(result)
 
-@app.route('/recent')
-def get_recent_exercises():
-    client = MongoClient("mongodb://localhost:27017/")
-    db = client['capstone']  # Pastikan sama dengan yang di atas
-    collection = db['visualisasi2']
-    one_day_ago = datetime.utcnow() - timedelta(days=1)
-    recent_exercises = list(collection.find({'last_synced': {'$gte': one_day_ago}}, {'_id': 0, 'name': 1, 'last_synced': 1}))
-    return {'recent_exercises': recent_exercises}
+if st.button("📋 Tampilkan Semua Latihan"):
+    data = list(collection.find().sort("name", 1))
+    if data:
+        for item in data:
+            st.subheader(item['name'])
+            st.write(f"Kategori: {item.get('category_name', 'Unknown')}")
+            st.write(f"Peralatan: {', '.join(item.get('equipment_names', []))}")
+            st.write(f"Otot Utama: {', '.join(item.get('muscle_names', []))}")
+            st.write(f"Otot Sekunder: {', '.join(item.get('muscle_secondary_names', []))}")
+            st.markdown("---")
+    else:
+        st.warning("Belum ada data latihan tersimpan.")
 
-if __name__ == '__main__':
-    print("🚀 Flask server berjalan di http://localhost:5000")
-    app.run(debug=True)
