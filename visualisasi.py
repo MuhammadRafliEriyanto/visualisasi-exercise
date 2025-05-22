@@ -5,10 +5,13 @@ from pymongo import MongoClient
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Koneksi MongoDB (ubah sesuai konfigurasi kamu)
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
-load_dotenv()
+
 
 mongo_uri = os.getenv("MONGODB_URI")
 print("DEBUG MONGODB_URI:", mongo_uri)  # 👈 harus tampil URI Atlas
