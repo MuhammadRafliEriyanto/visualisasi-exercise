@@ -8,11 +8,12 @@ from dotenv import load_dotenv
 
 # Koneksi MongoDB (ubah sesuai konfigurasi kamu)
 
-load_dotenv()  # load .env file
+load_dotenv()
 
 mongo_uri = os.getenv("MONGODB_URI")
+print("DEBUG MONGODB_URI:", mongo_uri)
 
-client = MongoClient(mongo_uri)
+client = MongoClient(mongo_uri)  # ✅ Benar!
 db = client["capstone"]
 collection = db["exercises"]
 
