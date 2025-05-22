@@ -10,10 +10,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Ambil URI dari env
 mongo_uri = os.getenv("MONGODB_URI")
 print("DEBUG MONGODB_URI:", mongo_uri)
 
-client = MongoClient(mongo_uri)  # ✅ Benar!
+# Gunakan URI ini untuk koneksi
+client = MongoClient(mongo_uri)  # ❗️JANGAN MongoClient() tanpa argumen!
 db = client["capstone"]
 collection = db["exercises"]
 
