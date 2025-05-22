@@ -10,14 +10,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Ambil URI dari env
 mongo_uri = os.getenv("MONGODB_URI")
-print("DEBUG MONGODB_URI:", mongo_uri)
+print("DEBUG MONGODB_URI:", mongo_uri)  # 👈 harus tampil URI Atlas
 
-# Gunakan URI ini untuk koneksi
-client = MongoClient(mongo_uri)  # ❗️JANGAN MongoClient() tanpa argumen!
-db = client["capstone"]
-collection = db["exercises"]
+if not mongo_uri:
+    st.error("❌ MONGODB_URI tidak ditemukan!")
+    st.stop()
+
+try:
+    client = MongoClient(mongo_uri)
+    db = client["capstone"]
+    collection = db["exercises"]
+    print("✅ BERHASIL konek ke MongoDB Atlas")
+except Exception as e:
+    st.error(f"❌ Gagal konek ke MongoDB: {e}")
+    st.stop()
 
 # Fungsi sinkronisasi data dari API WGER
 def sync_exercise_data():
